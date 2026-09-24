@@ -16,7 +16,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install openai requests
+        run: pip install requests
 
       - name: Run AI Bot
         env:
@@ -28,8 +28,7 @@ jobs:
           REPO_NAME: ${{ github.repository }}
         run: |
           python -c "
-          import os, requests
-          from openai import OpenAI
+          import os, requests, json
 
           api_key = os.getenv('AGENT_ROUTER_API_KEY')
           gh_token = os.getenv('GITHUB_TOKEN')
@@ -38,27 +37,36 @@ jobs:
           title = os.getenv('ISSUE_TITLE')
           body = os.getenv('ISSUE_BODY')
 
+          # Panggil API OpenAI Resmi
           try:
-              client = OpenAI(
-                  api_key=api_key,
-                  base_url='https://agentrouter.org/v1'
+              ai_response = requests.post(
+                  'https://api.openai.com/v1/chat/completions',
+                  headers={
+                      'Authorization': f'Bearer {api_key}',
+                      'Content-Type': 'application/json'
+                  },
+                  json={
+                      'model': 'gpt-6-astra',
+                      'messages': [
+                          {'role': 'user', 'content': f'Bantu jawab issue ini secara singkat:\nJudul: {title}\nIsi: {body}'}
+                      ]
+                  },
+                  timeout=60
               )
 
-              response = client.chat.completions.create(
-                  model='gpt-6-astra',
-                  messages=[
-                      {'role': 'user', 'content': f'Bantu jawab issue ini:\nJudul: {title}\nIsi: {body}'}
-                  ],
-                  timeout=30.0
-              )
-              reply = response.choices[0].message.content
+              if ai_response.status_code == 200:
+                  res_data = ai_response.json()
+                  reply = res_data['choices'][0]['message']['content']
+              else:
+                  reply = f'⚠️ **Error dari OpenAI (HTTP {ai_response.status_code}):**\n```json\n{ai_response.text}\n```'
           except Exception as e:
-              reply = f'Gagal memproses AI: {str(e)}'
+              reply = f'⚠️ **Gagal terhubung:** {str(e)}'
 
-          url = f'https://api.github.com/repos/{repo}/issues/{issue_num}/comments'
-          headers = {
+          # Post balasan ke GitHub Issue
+          gh_url = f'https://api.github.com/repos/{repo}/issues/{issue_num}/comments'
+          gh_headers = {
               'Authorization': f'Bearer {gh_token}',
               'Accept': 'application/vnd.github+json'
           }
-          requests.post(url, headers=headers, json={'body': f'🤖 **AI Bot Response:**\n\n{reply}'})
+          requests.post(gh_url, headers=gh_headers, json={'body': f'🤖 **AI Bot Response:**\n\n{reply}'})
           "

@@ -28,7 +28,7 @@ jobs:
           REPO_NAME: ${{ github.repository }}
         run: |
           python -c "
-          import os, requests
+          import os, requests, json
 
           api_key = os.getenv('GEMINI_API_KEY').strip()
           gh_token = os.getenv('GITHUB_TOKEN')
@@ -37,31 +37,29 @@ jobs:
           title = os.getenv('ISSUE_TITLE')
           body = os.getenv('ISSUE_BODY')
 
-          # Panggil API Resmi Google Gemini
+          # URL Native API Gemini Resmi
+          url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}'
+
+          payload = {
+              'contents': [{
+                  'parts': [{
+                      'text': f'Bantu jawab issue ini secara singkat dan jelas dalam Bahasa Indonesia:\nJudul: {title}\nIsi: {body}'
+                  }]
+              }]
+          }
+
           try:
-              res = requests.post(
-                  'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-                  headers={
-                      'Authorization': f'Bearer {api_key}',
-                      'Content-Type': 'application/json'
-                  },
-                  json={
-                      'model': 'gemini-1.5-flash',
-                      'messages': [
-                          {'role': 'user', 'content': f'Bantu jawab issue ini secara singkat dan jelas dalam Bahasa Indonesia:\nJudul: {title}\nIsi: {body}'}
-                      ]
-                  },
-                  timeout=30
-              )
+              res = requests.post(url, json=payload, timeout=30)
 
               if res.status_code == 200:
-                  reply = res.json()['choices'][0]['message']['content']
+                  data = res.json()
+                  reply = data['candidates'][0]['content']['parts'][0]['text']
               else:
                   reply = f'⚠️ **Error dari Gemini (HTTP {res.status_code}):**\n```json\n{res.text}\n```'
           except Exception as e:
               reply = f'⚠️ **Gagal terhubung:** {str(e)}'
 
-          # Post balasan ke Issue
+          # Post komentar ke GitHub Issue
           gh_url = f'https://api.github.com/repos/{repo}/issues/{issue_num}/comments'
           gh_headers = {
               'Authorization': f'Bearer {gh_token}',

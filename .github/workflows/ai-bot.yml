@@ -28,27 +28,27 @@ jobs:
           REPO_NAME: ${{ github.repository }}
         run: |
           python -c "
-          import os, requests, json
+          import os, requests
 
-          api_key = os.getenv('AGENT_ROUTER_API_KEY')
+          api_key = os.getenv('AGENT_ROUTER_API_KEY').strip()
           gh_token = os.getenv('GITHUB_TOKEN')
           repo = os.getenv('REPO_NAME')
           issue_num = os.getenv('ISSUE_NUMBER')
           title = os.getenv('ISSUE_TITLE')
           body = os.getenv('ISSUE_BODY')
 
-          # Panggil API OpenAI Resmi
+          # Request ke AgentRouter menggunakan model Claude Opus 5
           try:
               ai_response = requests.post(
-                  'https://api.openai.com/v1/chat/completions',
+                  'https://agentrouter.org/v1/chat/completions',
                   headers={
                       'Authorization': f'Bearer {api_key}',
                       'Content-Type': 'application/json'
                   },
                   json={
-                      'model': 'gpt-6-astra',
+                      'model': 'claude-opus-5',
                       'messages': [
-                          {'role': 'user', 'content': f'Bantu jawab issue ini secara singkat:\nJudul: {title}\nIsi: {body}'}
+                          {'role': 'user', 'content': f'Bantu jawab issue ini secara singkat dan jelas dalam Bahasa Indonesia:\nJudul: {title}\nIsi: {body}'}
                       ]
                   },
                   timeout=60
@@ -58,7 +58,7 @@ jobs:
                   res_data = ai_response.json()
                   reply = res_data['choices'][0]['message']['content']
               else:
-                  reply = f'⚠️ **Error dari OpenAI (HTTP {ai_response.status_code}):**\n```json\n{ai_response.text}\n```'
+                  reply = f'⚠️ **Error (HTTP {ai_response.status_code}):**\n```json\n{ai_response.text}\n```'
           except Exception as e:
               reply = f'⚠️ **Gagal terhubung:** {str(e)}'
 
@@ -68,5 +68,5 @@ jobs:
               'Authorization': f'Bearer {gh_token}',
               'Accept': 'application/vnd.github+json'
           }
-          requests.post(gh_url, headers=gh_headers, json={'body': f'🤖 **AI Bot Response:**\n\n{reply}'})
+          requests.post(gh_url, headers=gh_headers, json={'body': f'🤖 **AI Bot Response (Claude Opus 5):**\n\n{reply}'})
           "

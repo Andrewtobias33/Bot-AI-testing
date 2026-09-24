@@ -28,7 +28,7 @@ jobs:
           REPO_NAME: ${{ github.repository }}
         run: |
           python -c "
-          import os, requests
+          import os, requests, json
 
           api_key = os.getenv('AGENT_ROUTER_API_KEY').strip()
           gh_token = os.getenv('GITHUB_TOKEN')
@@ -37,10 +37,10 @@ jobs:
           title = os.getenv('ISSUE_TITLE')
           body = os.getenv('ISSUE_BODY')
 
-          # Request ke AgentRouter menggunakan model claude-opus-4-8
+          # Panggil Endpoint Resmi AgentRouter
           try:
               ai_response = requests.post(
-                  'https://agentrouter.org/',
+                  'https://co.agentrouter.org/v1/chat/completions',
                   headers={
                       'Authorization': f'Bearer {api_key}',
                       'Content-Type': 'application/json'
@@ -58,7 +58,7 @@ jobs:
                   res_data = ai_response.json()
                   reply = res_data['choices'][0]['message']['content']
               else:
-                  reply = f'⚠️ **Error (HTTP {ai_response.status_code}):**\n```json\n{ai_response.text}\n```'
+                  reply = f'⚠️ **Error dari AgentRouter (HTTP {ai_response.status_code}):**\n```json\n{ai_response.text}\n```'
           except Exception as e:
               reply = f'⚠️ **Gagal terhubung:** {str(e)}'
 
@@ -68,5 +68,5 @@ jobs:
               'Authorization': f'Bearer {gh_token}',
               'Accept': 'application/vnd.github+json'
           }
-          requests.post(gh_url, headers=gh_headers, json={'body': f'🤖 **AI Bot Response (Claude Opus 5):**\n\n{reply}'})
+          requests.post(gh_url, headers=gh_headers, json={'body': f'🤖 **AI Bot Response (Claude Opus 4.8):**\n\n{reply}'})
           "

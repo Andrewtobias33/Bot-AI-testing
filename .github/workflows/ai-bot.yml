@@ -20,7 +20,7 @@ jobs:
 
       - name: Run AI Bot
         env:
-          AGENT_ROUTER_API_KEY: ${{ secrets.AGENT_ROUTER_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.AGENT_ROUTER_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
@@ -28,45 +28,44 @@ jobs:
           REPO_NAME: ${{ github.repository }}
         run: |
           python -c "
-          import os, requests, json
+          import os, requests
 
-          api_key = os.getenv('AGENT_ROUTER_API_KEY').strip()
+          api_key = os.getenv('GEMINI_API_KEY').strip()
           gh_token = os.getenv('GITHUB_TOKEN')
           repo = os.getenv('REPO_NAME')
           issue_num = os.getenv('ISSUE_NUMBER')
           title = os.getenv('ISSUE_TITLE')
           body = os.getenv('ISSUE_BODY')
 
-          # Panggil Endpoint Resmi AgentRouter
+          # Panggil API Resmi Google Gemini
           try:
-              ai_response = requests.post(
-                  'https://co.agentrouter.org/v1/chat/completions',
+              res = requests.post(
+                  'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
                   headers={
                       'Authorization': f'Bearer {api_key}',
                       'Content-Type': 'application/json'
                   },
                   json={
-                      'model': 'claude-opus-4-8',
+                      'model': 'gemini-1.5-flash',
                       'messages': [
                           {'role': 'user', 'content': f'Bantu jawab issue ini secara singkat dan jelas dalam Bahasa Indonesia:\nJudul: {title}\nIsi: {body}'}
                       ]
                   },
-                  timeout=60
+                  timeout=30
               )
 
-              if ai_response.status_code == 200:
-                  res_data = ai_response.json()
-                  reply = res_data['choices'][0]['message']['content']
+              if res.status_code == 200:
+                  reply = res.json()['choices'][0]['message']['content']
               else:
-                  reply = f'⚠️ **Error dari AgentRouter (HTTP {ai_response.status_code}):**\n```json\n{ai_response.text}\n```'
+                  reply = f'⚠️ **Error dari Gemini (HTTP {res.status_code}):**\n```json\n{res.text}\n```'
           except Exception as e:
               reply = f'⚠️ **Gagal terhubung:** {str(e)}'
 
-          # Post balasan ke GitHub Issue
+          # Post balasan ke Issue
           gh_url = f'https://api.github.com/repos/{repo}/issues/{issue_num}/comments'
           gh_headers = {
               'Authorization': f'Bearer {gh_token}',
               'Accept': 'application/vnd.github+json'
           }
-          requests.post(gh_url, headers=gh_headers, json={'body': f'🤖 **AI Bot Response (Claude Opus 4.8):**\n\n{reply}'})
+          requests.post(gh_url, headers=gh_headers, json={'body': f'🤖 **AI Bot Response (Gemini):**\n\n{reply}'})
           "

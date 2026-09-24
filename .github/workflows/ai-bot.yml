@@ -1,0 +1,62 @@
+name: AI Code Reviewer Bot
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Run AI Bot
+        env:
+          AGENT_ROUTER_API_KEY: ${{ secrets.AGENT_ROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO_NAME: ${{ github.repository }}
+        run: |
+          python -c "
+          import os, urllib.request, json
+
+          api_key = os.getenv('AGENT_ROUTER_API_KEY')
+          gh_token = os.getenv('GITHUB_TOKEN')
+          repo = os.getenv('REPO_NAME')
+          issue_num = os.getenv('ISSUE_NUMBER')
+          title = os.getenv('ISSUE_TITLE')
+          body = os.getenv('ISSUE_BODY')
+
+          # Panggil AgentRouter API
+          req = urllib.request.Request(
+              'https://agentrouter.ai/v1/chat/completions',
+              headers={
+                  'Authorization': f'Bearer {api_key}',
+                  'Content-Type': 'application/json'
+              },
+              data=json.dumps({
+                  'model': 'auto',
+                  'messages': [{'role': 'user', 'content': f'Bantu jawab issue ini:\nJudul: {title}\nIsi: {body}'}]
+              }).encode('utf-8')
+          )
+          
+          try:
+              with urllib.request.urlopen(req) as response:
+                  res_data = json.loads(response.read().decode())
+                  reply = res_data['choices'][0]['message']['content']
+          except Exception as e:
+              reply = f'Gagal memproses AI: {str(e)}'
+
+          # Kirim balasan ke Issue GitHub
+          gh_req = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/issues/{issue_num}/comments',
+              headers={
+                  'Authorization': f'Bearer {gh_token}',
+                  'Accept': 'application/vnd.github+json'
+              },
+              data=json.dumps({'body': f'🤖 **AI Bot Response:**\n\n{reply}'}).encode('utf-8')
+          )
+          urllib.request.urlopen(gh_req)
+          "
